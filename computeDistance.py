@@ -239,7 +239,9 @@ def logistic(x, alpha):
 
 # method that takes an input CSV with bounding box data and outputs
 # a value for each second (a higher value means less likely to be a good frame)
-def compute_frame_classification(csv_filename, video_duration = 30, size_threshold = 0.005, detect_threshold = 0.7, iou_threshold=0.7):
+def compute_frame_classification(csv_filename, video_duration = 30,
+                                 size_threshold = 0.005, mean_size_threshold = 0.01,
+                                 detect_threshold = 0.7, iou_threshold=0.7):
     # Get the raw boxes from the CSV
     raw_boxes_output, box_per_frame = get_raw_boxes_information(csv_filename)
     # Compute the average number of frame per second
@@ -250,12 +252,13 @@ def compute_frame_classification(csv_filename, video_duration = 30, size_thresho
     # Compute the number of humans per frame
     humans_per_frame = get_human_boxes_per_frame(boxes_output, detect_threshold = detect_threshold, size_threshold = size_threshold)
     # Compute the global mean humans per frame (with higher size threshold)
-    global_mean = np.mean(get_human_boxes_per_frame(boxes_output, detect_threshold = detect_threshold, size_threshold = 0.02))
+    global_mean = np.mean(get_human_boxes_per_frame(boxes_output, detect_threshold = detect_threshold, size_threshold = mean_size_threshold))
     print(global_mean)
     # Compute the distance
     dist = compute_average_distance_to_mean(humans_per_frame, width = frame_per_sec, mean = global_mean)
 
     return dist
+
 
 # method that saves the distance to an output CSV file
 def save_frame_classification(distance, output_filename):
@@ -273,15 +276,18 @@ video_duration = -1
 size_threshold = 0.005
 detect_threshold = 0.7
 iou_threshold = 0.7
+mean_size_threshold = 0.01
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:],"hi:o:v:s:d:iou")
+    opts, args = getopt.getopt(sys.argv[1:],"hi:o:v:s:d:t:m:")
 except getopt.GetoptError:
-    print('usage: computeDistance.py -i <inputfile> -o <outputfile> -v <video_duration> [-s <size_threshold> -d <detection_threshold> -iou <iou_threshold>]')
+    print('usage: computeDistance.py -i <inputfile> -o <outputfile> -v <video_duration> [-s <size_threshold> '
+          '-d <detection_threshold> -t <iou_threshold> -m <mean_size_thresold>]')
     sys.exit(2)
 for opt, arg in opts:
     if opt == '-h':
-        print('usage: computeBoundingBoxes.py -i <inputfile> -s <start time (s)> -e <end time (s)> [-o <outputfile>]')
+        print('usage: computeDistance.py -i <inputfile> -o <outputfile> -v <video_duration> [-s <size_threshold> '
+              '-d <detection_threshold> -t <iou_threshold> -m <mean_size_thresold>]')
         sys.exit()
     elif opt in ("-i"):
         inputfile = arg
@@ -293,17 +299,20 @@ for opt, arg in opts:
         size_threshold = float(arg)
     elif opt in ("-d"):
         detect_threshold = float(arg)
-    elif opt in ("-iou"):
+    elif opt in ("-t"):
         iou_threshold = float(arg)
+    elif opt in ("-m"):
+        mean_size_threshold = float(arg)
 
 if inputfile=='' or outputfile=='' or video_duration==-1:
-    print('usage: computeDistance.py -i <inputfile> -o <outputfile> -v <video_duration> [-s <size_threshold> -d <detection_threshold> -iou <iou_threshold>]')
+    print('usage: computeDistance.py -i <inputfile> -o <outputfile> -v <video_duration> [-s <size_threshold> '
+          '-d <detection_threshold> -t <iou_threshold> -m <mean_size_thresold>]')
     sys.exit()
 
 # Compute the distance
 dist = compute_frame_classification(csv_filename = inputfile, video_duration = video_duration,
-                                    size_threshold = size_threshold, detect_threshold = detect_threshold,
-                                    iou_threshold=iou_threshold)
+                                    size_threshold = size_threshold, mean_size_threshold = mean_size_threshold,
+                                    detect_threshold = detect_threshold, iou_threshold=iou_threshold)
 
 # Save the distances to an output CSV
 save_frame_classification(dist, outputfile)
