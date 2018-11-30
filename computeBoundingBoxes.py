@@ -1,17 +1,8 @@
 import numpy as np
-import os
-import six.moves.urllib as urllib
-import sys, getopt
-import tarfile
+import sys
+import getopt
 import tensorflow as tf
-import zipfile
 import csv
-
-from collections import defaultdict
-from io import StringIO
-from matplotlib import pyplot as plt
-#import matplotlib.pyplot as plt
-from PIL import Image
 
 # This is needed since the notebook is stored in the object_detection folder.
 sys.path.append("..")
@@ -21,15 +12,14 @@ from object_detection.utils import visualization_utils as vis_util
 
 # Import everything needed to edit/save/watch video clips
 from moviepy.editor import VideoFileClip
-from IPython.display import HTML
 
-#print(tf.__version__)
 
 # Read the parameters of the script and check they are OK
 inputfile = ''
 outputfile = ''
 tmin = -1
 tmax = -1
+
 try:
     opts, args = getopt.getopt(sys.argv[1:],"hi:o:s:e:")
 except getopt.GetoptError:
@@ -39,15 +29,15 @@ for opt, arg in opts:
     if opt == '-h':
         print('usage: computeBoundingBoxes.py -i <inputfile> -s <start time (s)> -e <end time (s)> [-o <outputfile>]')
         sys.exit()
-    elif opt in ("-i"):
+    elif opt in "-i":
         inputfile = arg
-    elif opt in ("-o"):
+    elif opt in "-o":
         outputfile = arg
-    elif opt in ("-s"):
+    elif opt in "-s":
         tmin = int(arg)
-    elif opt in ("-e"):
+    elif opt in "-e":
         tmax = int(arg)
-if inputfile=='' or tmin==-1 or tmax==-1:
+if inputfile == '' or tmin == -1 or tmax == -1:
     print('usage: computeBoundingBoxes.py -i <inputfile> -s <start time (s)> -e <end time (s)> [-o <outputfile>]')
     sys.exit()  
 outputCSVfile = inputfile.split('.')[0]+'_'+str(tmin)+'-'+str(tmax)+'out.csv'
@@ -60,6 +50,7 @@ def detect_videos(image_np, sess, detection_graph):
         ops = tf.get_default_graph().get_operations()
         all_tensor_names = {output.name for op in ops for output in op.outputs}
         tensor_dict = {}
+        # Uncomment the key 'detection_masks' to output also the masks
         for key in [
               'num_detections', 'detection_boxes', 'detection_scores',
               'detection_classes'#, 'detection_masks'
@@ -84,11 +75,11 @@ def detect_videos(image_np, sess, detection_graph):
                 detection_masks_reframed, 0)
         image_tensor = tf.get_default_graph().get_tensor_by_name('image_tensor:0')
 
-      # Run inference
+        # Run inference
         output_dict = sess.run(tensor_dict,
-                             feed_dict={image_tensor: np.expand_dims(image_np, 0)})
+                               feed_dict={image_tensor: np.expand_dims(image_np, 0)})
 
-      # all outputs are float32 numpy arrays, so convert types as appropriate
+        # all outputs are float32 numpy arrays, so convert types as appropriate
         output_dict['num_detections'] = int(output_dict['num_detections'][0])
         output_dict['detection_classes'] = output_dict[
           'detection_classes'][0].astype(np.uint8)
@@ -121,18 +112,19 @@ def dict_to_csv(scraped_values_dict, csv_filename):
         else: 
             w.writerow(my_dict)
 
+
 # Method to process image, to be used with fl_image
-def process_image(image):  
+def process_image(image):
     
     global counter
     
-    if counter%1==0:
+    if counter % 1 == 0:
    
         with detection_graph.as_default():
             with tf.Session(graph=detection_graph) as sess:
                 image_np, output_dict = detect_videos(image, sess, detection_graph) 
 
-    counter +=1 
+    counter += 1
     
     dict_to_csv(output_dict, outputCSVfile)
     
@@ -141,19 +133,14 @@ def process_image(image):
 
 # method to load an image into a numpy array
 def load_image_into_numpy_array(image):
-  (im_width, im_height) = image.size
-  return np.array(image.getdata()).reshape(
-      (im_height, im_width, 3)).astype(np.uint8)
-
-
+    (im_width, im_height) = image.size
+    return np.array(image.getdata()).reshape((im_height, im_width, 3)).astype(np.uint8)
 
 # Path to frozen detection graph. This is the actual model that is used for the object detection.
-#PATH_TO_MODEL = '/home/vince/Documents/Freelance/Sweesp/source/frameClassification/mask_rcnn_inception_v2_coco_2018_01_28/frozen_inference_graph.pb'
-#PATH_TO_MODEL = '/home/vince/Documents/Freelance/Sweesp/source/frameClassification/faster_rcnn_inception_v2_coco_2018_01_28/frozen_inference_graph.pb'
-PATH_TO_MODEL = '/home/vince/Documents/Freelance/Sweesp/source/frameClassification/network_models/faster_rcnn_resnet101_coco_2018_01_28/frozen_inference_graph.pb'
-#PATH_TO_MODEL = '/home/vince/Documents/Freelance/Sweesp/source/frameClassification/network_models/faster_rcnn_nas_coco_2018_01_28/frozen_inference_graph.pb'
+PATH_TO_MODEL = 'network_models/faster_rcnn_resnet101_coco_2018_01_28/frozen_inference_graph.pb'
+
 # List of the strings that is used to add correct label for each box.
-PATH_TO_LABELS = '/home/vince/Documents/Freelance/Sweesp/source/models/research/object_detection/data/mscoco_label_map.pbtxt'
+PATH_TO_LABELS = '../models/research/object_detection/data/mscoco_label_map.pbtxt'
 
 NUM_CLASSES = 90
 
@@ -173,11 +160,11 @@ category_index = label_map_util.create_category_index(categories)
 # Needed at the moment
 counter = 0
 
-if outputfile=='' :
-    clip1 = VideoFileClip(inputfile).subclip(tmin,tmax)
+if outputfile == '':
+    clip1 = VideoFileClip(inputfile).subclip(tmin, tmax)
     new_clip = [process_image(frame) for frame in clip1.iter_frames()]
-else :
-    clip1 = VideoFileClip(inputfile).subclip(tmin,tmax)
+else:
+    clip1 = VideoFileClip(inputfile).subclip(tmin, tmax)
     white_clip = clip1.fl_image(process_image)
     white_clip.write_videofile(outputfile, audio=False)
 

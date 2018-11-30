@@ -1,10 +1,10 @@
 import csv
 import numpy as np
-import matplotlib.pyplot as plt
-import sys, getopt
+import sys
+import getopt
 
 
-# Method that takes the csv file as input and return the informations about the bounding boxes per frame
+# Method that takes the csv file as input and return the information about the bounding boxes per frame
 def get_raw_boxes_information(csv_filename) :
     # Define the output
     boxes_output = []
@@ -18,19 +18,16 @@ def get_raw_boxes_information(csv_filename) :
             # Get the number of detection for a given row
             num_detect = int(row['num_detections'])
             box_per_frame.append(num_detect)
-            #print(num_detect)
 
             # Get the detection scores of those detections
             detect_score = row['detection_scores'][1:-1].split()[:num_detect]
             # Convert the string to a float
             detect_score = [float(item) for item in detect_score]
-            #print(detect_score)
 
             # Get the classes of those detections
             classes = row['detection_classes'][1:-1].split()[:num_detect]
             # Convert the string to int
             classes = [int(item) for item in classes]
-            #print(classes)
 
             # Get the bounding boxes positions
             xmin = []
@@ -48,7 +45,6 @@ def get_raw_boxes_information(csv_filename) :
             # append the data
             boxes_output.append([detect_score, classes, xmin, ymin, xmax, ymax])
 
-    
     return boxes_output, box_per_frame
     
 
@@ -65,11 +61,8 @@ def non_max_suppression(boxes_info, iou_threshold = 0.8):
         y1 = np.asarray(frame)[3,:]
         x2 = np.asarray(frame)[4,:]
         y2 = np.asarray(frame)[5,:]
-        
-         
-        # compute the area of the bounding boxes
-        area = (x2 - x1) * (y2 - y1)
-        # and sort the bounding by detection score
+
+        # sort the bounding by detection score
         idxs = np.argsort(frame[0])
         
         # keep looping while some indices still remain in the index list
@@ -99,9 +92,7 @@ def non_max_suppression(boxes_info, iou_threshold = 0.8):
             idxs = np.delete(idxs, np.concatenate(([last],
                    np.where(iou > iou_threshold)[0])))
             
-        # return only the bounding boxes that were picked using the
-        # integer data type
-        #print(pick)
+        # return only the bounding boxes that were picked using the integer data type
         score = []
         classes = []
         xmin = []
@@ -116,13 +107,12 @@ def non_max_suppression(boxes_info, iou_threshold = 0.8):
             xmax.append(frame[4][i])
             ymax.append(frame[5][i])
         output_boxes.append([score,classes,xmin,ymin,xmax,ymax])
-        #output_boxes.append(boxes_info[pick])
-        #for box in boxes_info[pick] :
-        #    output_boxes.append(box)
+
     return output_boxes
 
+
 # Method that returns the number of human boxes per frame for a given threshold over detection confidence
-def get_human_boxes_per_frame(boxes_info, detect_threshold = 0.5, size_threshold = 0.0) :
+def get_human_boxes_per_frame(boxes_info, detect_threshold=0.5, size_threshold=0.0):
     human_per_frame = []
     # loop over all frames
     for frame in boxes_info :
@@ -130,7 +120,7 @@ def get_human_boxes_per_frame(boxes_info, detect_threshold = 0.5, size_threshold
         count = 0
         # loop over all boxes in that frame
         for i in range(len(frame[0])):
-            # check the score is greather than the threshold and the class is human
+            # check the score is greater than the threshold and the class is human
             if frame[0][i] > detect_threshold and frame[1][i]==1:
                 # if a size threshold is given check the box is larger
                 if size_threshold > 0.:
@@ -144,8 +134,37 @@ def get_human_boxes_per_frame(boxes_info, detect_threshold = 0.5, size_threshold
     return human_per_frame
 
 
+# Method that returns the weighted number of human boxes per frame for a given threshold over detection confidence
+def get_weighted_human_boxes_per_frame(boxes_info, detect_threshold=0.5, size_threshold=0.0):
+    human_per_frame = []
+
+    # loop over all frames
+    for frame in boxes_info:
+        # define a mean to zero
+        count = 0.
+        # loop over all boxes in that frame
+        for i in range(len(frame[0])):
+            # check the score is greather than the threshold and the class is human
+            if frame[0][i] > detect_threshold and frame[1][i] == 1:
+                # compute the x and y center of the box
+                xcenter = np.abs(0.5 * (frame[2][i] + frame[4][i]) - 0.5)
+                ycenter = np.abs(0.5 * (frame[3][i] + frame[5][i]) - 0.5)
+                radial_dist = np.square(xcenter) + np.square(ycenter)
+                weight = 1 - 2 * radial_dist
+                # if a size threshold is given check the box is larger
+                if size_threshold > 0.:
+                    size = (frame[4][i] - frame[2][i]) * (frame[5][i] - frame[3][i])
+                    if size > size_threshold:
+                        count = count + weight
+                else:
+                    count = count + weight
+        human_per_frame.append(count)
+
+    return human_per_frame
+
+
 # Method that returns the mean human boxes size per frame for a given threshold over detection confidence
-def get_mean_human_boxes_size_per_frame(boxes_info, detect_threshold = 0.5) :
+def get_mean_human_boxes_size_per_frame(boxes_info, detect_threshold=0.5):
     mean_box_size = []
     # loop over all frames
     for frame in boxes_info :
@@ -154,7 +173,7 @@ def get_mean_human_boxes_size_per_frame(boxes_info, detect_threshold = 0.5) :
         count = 0
         # loop over all boxes in that frame
         for i in range(len(frame[0])):
-            # check the score is greather than the threshold and the class is human
+            # check the score is greater than the threshold and the class is human
             if frame[0][i] > detect_threshold and frame[1][i]==1:
                 mean = (frame[4][i]-frame[2][i])*(frame[5][i]-frame[3][i])
                 count += 1
@@ -163,8 +182,9 @@ def get_mean_human_boxes_size_per_frame(boxes_info, detect_threshold = 0.5) :
             
     return mean_box_size
 
+
 # Method that computes the histogram of the human boxes sizes
-def get_human_boxes_size_hist(boxes_info, detect_threshold = 0.5):
+def get_human_boxes_size_hist(boxes_info, detect_threshold=0.5):
     human_box_size = []
     # loop over all frames
     for frame in boxes_info :
@@ -176,6 +196,7 @@ def get_human_boxes_size_hist(boxes_info, detect_threshold = 0.5):
             
     return human_box_size
 
+
 # Method that computes the histogram of the detection scores
 def get_detection_score_hist(boxes_info):
     detect_score_hist = []
@@ -186,6 +207,7 @@ def get_detection_score_hist(boxes_info):
             detect_score_hist.append(frame[0][i])
             
     return detect_score_hist
+
 
 # method that computes the intersection over union of two boxes
 def get_iou(box1, box2):
@@ -205,10 +227,11 @@ def get_iou(box1, box2):
 
     return iou
 
+
 # smoothing curve with rounding 
-def curve_smoothing(y, width) :
+def curve_smoothing(y, width):
     yhat = y.copy()
-    for i in range(len(y)) :
+    for i in range(len(y)):
         low = max(0,int(i-width/2 + 1))
         high = min(len(y)-1, int(i+width/2))
                   
@@ -217,102 +240,103 @@ def curve_smoothing(y, width) :
         
     return yhat
 
+
 # method that takes as input a bunch of values and computes the distance
 # to the mean for a given width (e.g. 1 second)
 def compute_average_distance_to_mean(y, width, mean=0):
-    if mean==0:
+    if mean == 0:
         round_mean_val = round(np.mean(y))
-    else :
+    else:
         round_mean_val = round(mean)
     output = np.zeros(int(len(y)/width))
     for i in range(int(len(y)/width)):
         output[i] = (np.mean(y[i*width:min((i+1)*width,len(y)-1)]))
-        #print(output[i]-round_mean_val)
-        
-    return (output-round_mean_val)
+
+    return output-round_mean_val
+
 
 def gauss(x, mu, sigma):
     return np.exp(-np.square(x-mu)/(2*sigma*sigma))
 
+
 def logistic(x, alpha):
     return 1./(1+np.exp(-alpha*x))
 
+
 # method that takes an input CSV with bounding box data and outputs
 # a value for each second (a higher value means less likely to be a good frame)
-def compute_frame_classification(csv_filename, video_duration = 30,
-                                 size_threshold = 0.005, mean_size_threshold = 0.01,
-                                 detect_threshold = 0.7, iou_threshold=0.7):
+def compute_frame_classification(csv_filename, video_duration=30, size_threshold=0.005, mean_size_threshold=0.01,
+                                 detect_threshold=0.7, iou_threshold=0.7):
     # Get the raw boxes from the CSV
     raw_boxes_output, box_per_frame = get_raw_boxes_information(csv_filename)
     # Compute the average number of frame per second
     frame_per_sec = int(len(box_per_frame)/video_duration)
-    print('frame per second:', frame_per_sec)
     # Compute non max suppression
-    boxes_output = non_max_suppression(raw_boxes_output, iou_threshold = iou_threshold)
+    boxes_output = non_max_suppression(raw_boxes_output, iou_threshold=iou_threshold)
     # Compute the number of humans per frame
-    humans_per_frame = get_human_boxes_per_frame(boxes_output, detect_threshold = detect_threshold, size_threshold = size_threshold)
+    humans_per_frame = get_human_boxes_per_frame(boxes_output, detect_threshold=detect_threshold,
+                                                 size_threshold=size_threshold)
     # Compute the global mean humans per frame (with higher size threshold)
-    global_mean = np.mean(get_human_boxes_per_frame(boxes_output, detect_threshold = detect_threshold, size_threshold = mean_size_threshold))
-    print(global_mean)
+    global_mean = np.mean(get_human_boxes_per_frame(boxes_output, detect_threshold=detect_threshold,
+                                                    size_threshold=mean_size_threshold))
     # Compute the distance
-    dist = compute_average_distance_to_mean(humans_per_frame, width = frame_per_sec, mean = global_mean)
+    dist = compute_average_distance_to_mean(humans_per_frame, width = frame_per_sec, mean=global_mean)
 
     return dist
 
 
 # method that saves the distance to an output CSV file
 def save_frame_classification(distance, output_filename):
-    time = np.arange(len(dist))
-    output = np.stack((time, dist), axis=1)
+    time = np.arange(len(distance))
+    output = np.stack((time, distance), axis=1)
     np.savetxt(output_filename, output, delimiter=",")
 
 
+if __name__ == '__main__':
+    # Read the parameters of the script and check they are OK
+    inputfile = ''
+    outputfile = ''
+    video_duration = -1
+    size_threshold = 0.005
+    detect_threshold = 0.7
+    iou_threshold = 0.7
+    mean_size_threshold = 0.01
 
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "hi:o:v:s:d:t:m:")
+    except getopt.GetoptError:
+        print('usage: computeDistance.py -i <inputfile> -o <outputfile> -v <video_duration> [-s <size_threshold> '
+              '-d <detection_threshold> -t <iou_threshold> -m <mean_size_thresold>]')
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print('usage: computeDistance.py -i <inputfile> -o <outputfile> -v <video_duration> [-s <size_threshold> '
+                  '-d <detection_threshold> -t <iou_threshold> -m <mean_size_thresold>]')
+            sys.exit()
+        elif opt in "-i":
+            inputfile = arg
+        elif opt in "-o":
+            outputfile = arg
+        elif opt in "-v":
+            video_duration = float(arg)
+        elif opt in "-s":
+            size_threshold = float(arg)
+        elif opt in "-d":
+            detect_threshold = float(arg)
+        elif opt in "-t":
+            iou_threshold = float(arg)
+        elif opt in "-m":
+            mean_size_threshold = float(arg)
 
-# Read the parameters of the script and check they are OK
-inputfile = ''
-outputfile = ''
-video_duration = -1
-size_threshold = 0.005
-detect_threshold = 0.7
-iou_threshold = 0.7
-mean_size_threshold = 0.01
-
-try:
-    opts, args = getopt.getopt(sys.argv[1:],"hi:o:v:s:d:t:m:")
-except getopt.GetoptError:
-    print('usage: computeDistance.py -i <inputfile> -o <outputfile> -v <video_duration> [-s <size_threshold> '
-          '-d <detection_threshold> -t <iou_threshold> -m <mean_size_thresold>]')
-    sys.exit(2)
-for opt, arg in opts:
-    if opt == '-h':
+    if inputfile == '' or outputfile == '' or video_duration == -1:
         print('usage: computeDistance.py -i <inputfile> -o <outputfile> -v <video_duration> [-s <size_threshold> '
               '-d <detection_threshold> -t <iou_threshold> -m <mean_size_thresold>]')
         sys.exit()
-    elif opt in ("-i"):
-        inputfile = arg
-    elif opt in ("-o"):
-        outputfile = arg
-    elif opt in ("-v"):
-        video_duration = float(arg)
-    elif opt in ("-s"):
-        size_threshold = float(arg)
-    elif opt in ("-d"):
-        detect_threshold = float(arg)
-    elif opt in ("-t"):
-        iou_threshold = float(arg)
-    elif opt in ("-m"):
-        mean_size_threshold = float(arg)
 
-if inputfile=='' or outputfile=='' or video_duration==-1:
-    print('usage: computeDistance.py -i <inputfile> -o <outputfile> -v <video_duration> [-s <size_threshold> '
-          '-d <detection_threshold> -t <iou_threshold> -m <mean_size_thresold>]')
-    sys.exit()
+    # Compute the distance
+    dist = compute_frame_classification(csv_filename=inputfile, video_duration=video_duration,
+                                        size_threshold=size_threshold, mean_size_threshold=mean_size_threshold,
+                                        detect_threshold=detect_threshold, iou_threshold=iou_threshold)
 
-# Compute the distance
-dist = compute_frame_classification(csv_filename = inputfile, video_duration = video_duration,
-                                    size_threshold = size_threshold, mean_size_threshold = mean_size_threshold,
-                                    detect_threshold = detect_threshold, iou_threshold=iou_threshold)
-
-# Save the distances to an output CSV
-save_frame_classification(dist, outputfile)
+    # Save the distances to an output CSV
+    save_frame_classification(dist, outputfile)
